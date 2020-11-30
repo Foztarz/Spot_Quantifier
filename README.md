@@ -7,4 +7,6 @@ plot_these <- list(grid = TRUE, #Fitted grid
                    found = TRUE,  #Colonies found
                    contour = TRUE #Contour plot
                    )
- ```
+ ```.
+## Example output:
+![Fitted grid](https://github.com/Foztarz/Spot_Quantifier/blob/master/ExampleOutput/CB-Killing_01h_11-07-20.JPG-Grid.jpeg)
