@@ -4,7 +4,7 @@ graphics.off()
 formals(data.frame)$stringsAsFactors <- FALSE
 # Details ---------------------------------------------------------------
 #       AUTHOR:	James Foster              DATE: 2020 11 10
-#     MODIFIED:	James Foster              DATE: 2020 11 11
+#     MODIFIED:	James Foster              DATE: 2021 07 13
 #
 #  DESCRIPTION: Loops through one spot assay images. Crops and identifies grid.
 #               Automatically fits grid lines so that they intersect with as few
@@ -17,6 +17,7 @@ formals(data.frame)$stringsAsFactors <- FALSE
 #
 #	   CHANGES: -copied from Spot_Quantifier.R
 #	            -corner double-counts cut
+#	            -1536 grid
 #
 #   REFERENCES: Kritikos, G., Banzhaf, M., Herrera-Dominguez, L. et al., (2017).
 #               A tool named Iris for versatile high-throughput phenotyping in microorganisms.
@@ -31,6 +32,7 @@ formals(data.frame)$stringsAsFactors <- FALSE
 #- Folder selector +
 #- Looping +
 #- Autocropping + 
+#- Rigidity setting
 #- Speed up 
 #- imager?
 
@@ -38,9 +40,11 @@ formals(data.frame)$stringsAsFactors <- FALSE
 
 #Grid rows and columns
 grid_pos <- list(
-                  columns = 12,
-                  rows = 8
+                  columns = 48,  #12,
+                  rows = 32  #8
                 )
+#Who made the plate? (Human or robot)
+is_robot <- TRUE
 # Colour channel to use
 col_chan <- 'green'#channel to use, 'red','green','blue', combinations ('redgreen') or all (RGB)
 # Palette for contour plots #can be any of hcl.pals()
@@ -51,11 +55,13 @@ plot_these <- list(grid = T,
                    contour = T
                    )
 #maximum cropped proportion
-crop_max <- 0.10 
+crop_max <- ifelse(is_robot, 0.070, 0.10) 
+#minimum cropped proportion
+crop_min <- ifelse(is_robot, 0.045, 0.00) 
 #Starting grid edge as a proportion of image height or width
-edge_prop <- 0.09
+edge_prop <- ifelse(is_robot, 0.065, 0.09)
 #maximum radio of grid spacing to default, e.g. 0.5 -> rectangles can be max 50% bigger or smaller
-spc_lim <- 0.3
+spc_lim <- ifelse(is_robot, 0.00, 0.3)#0 = no grid search
 # Image levels
 im_levels <- 256L #Resolution is probably higher, higher values could solve thresholding problems
 
@@ -165,7 +171,11 @@ for(ii in imgs){
       pr[2]>r_max |
       pr[3]>c_max*crop_max |
       pr[4]<c_max*(1-crop_max) |
-      pr[4]>c_max 
+      pr[4]>c_max |
+      pr[1]<r_max*crop_min |
+      pr[2]>r_max*(1-crop_min) |
+      pr[3]<c_max*crop_min |
+      pr[4]>c_max*(1-crop_min) 
     )
       {rect_mn <- 1e19}else
       {
@@ -180,7 +190,8 @@ for(ii in imgs){
       }
     return(rect_mn)
   }
-  rect_crop(c(grid_edges$h, grid_edges$v))
+  if(  rect_crop(c(grid_edges$h, grid_edges$v)) > 1e18 )
+    {warning('bad start for cropping frame')}
   rect_opt <- optim(c(grid_edges$h, grid_edges$v),
                     rect_crop#,
                     # control = list(trace = T)
@@ -219,19 +230,24 @@ for(ii in imgs){
     img.ots <- apply(img.ots, 1:2, sum) #Sum across colour channels #warning SLOW!
   }else{
   }
-  # add up colony pixels for each possible grid boundry position
+  # add up colony pixels for each possible grid boundary position
   i_cols <- apply(img.ots, 2, sum)#colony pixels along each column
   i_rows <- apply(img.ots, 1, sum)#colony pixels along each row
   
   # Test out positioning for different equidistant grids
   row_starts <- -(round(row_step/2)):round(row_step/2)#+- half of one grid square
   col_starts <- -(round(col_step/2)):round(col_step/2)#+- half of one grid square
+  if( !all( row_starts + round(row_step/2) < max(grid_edges$v) )  |
+      !all( col_starts + round(col_step/2) < max(grid_edges$h) )  
+  ){warning('specified grid space too small')}
   row_bright <- sapply(row_starts, function(x){sum(i_rows[x+basic_row])})#check the number of colony pixels for each position
   col_bright <- sapply(col_starts, function(x){sum(i_cols[x+basic_col])})#check the number of colony pixels for each position
   # Position the equidistant grid at the midpoint of the best options
-  row_equi <- round(median(row_starts[row_bright == min(row_bright)]))+basic_row
-  col_equi <- round(median(col_starts[col_bright == min(col_bright)]))+basic_col
+  row_equi <- round(median(row_starts[row_bright %in% min(row_bright,na.rm=T)]))+basic_row
+  col_equi <- round(median(col_starts[col_bright %in% min(col_bright,na.rm=T)]))+basic_col
   
+  if(spc_lim)
+  {
   #Set up a function to optimise grid positioning
   g_row_fun <- function(pr){
     if(all(pr > 0 & pr < row_max)){
@@ -285,11 +301,29 @@ for(ii in imgs){
   grd_col_par <- optim(col_equi, 
                        g_col_fun 
   )
+  }else
+  {#for the robot (spc_lim == 0), use a rigid grid
+    grd_row_par <- list(par = row_equi)
+    grd_col_par <- list(par = col_equi)
+  }
 
   # Plot fitted grid --------------------------------------------------------
   if(plot_these$grid){
     jpeg(filename = file.path(img_path,'Out', paste0(ii, '-Grid.jpeg')),
-         height = 4, width = 5, units = 'in', bg = 'white', res = 150)
+         height = 4*ifelse(test = all(grid_pos<20),
+                           yes = 1, 
+                           no = 2
+                           ), 
+         width = 5*ifelse(test = all(grid_pos<20),
+                          yes = 1, 
+                          no = 2
+                           ),  
+         units = 'in', bg = 'white',
+         res = ifelse(test = all(grid_pos<15),
+                      yes = 150, 
+                      no = 300
+                      )
+    )
     plot(as.raster(img.jpg), interpolate = T)
     abline(h = dim(img.jpg)[1] - (grid_edges$h[1] +grd_row_par$par),
            v = grid_edges$v[1] + grd_col_par$par,
@@ -314,9 +348,9 @@ for(ii in imgs){
   }  #if(plot_these$grid)
   
   # Loop through and calculate opacity --------------------------------------
-  row.breaks <- c(1, grd_row_par$par, row_max)
+    row.breaks <- c(1, grd_row_par$par, row_max)
   col.breaks <- c(1, grd_col_par$par, col_max)
-  opmat <- matrix(nrow = 8, ncol = 12,
+  opmat <- matrix(nrow = grid_pos$rows, ncol = grid_pos$columns,
                   dimnames = list(row = paste('row',1:grid_pos$rows),
                                   column = paste('column', 1:grid_pos$columns)
                   )
@@ -325,14 +359,29 @@ for(ii in imgs){
     # png(filename = file.path(img_path,'Out', paste0(ii, '-OtsuFound.png')),
     #     height = 4, width = 5, units = 'in', bg = 'white', res = 150)
     jpeg(filename = file.path(img_path,'Out', paste0(ii, '-OtsuFound.jpeg')),
-        height = 4, width = 5, units = 'in', bg = 'white', res = 150)
+         height = 4*ifelse(test = all(grid_pos<20),
+                           yes = 1, 
+                           no = 2
+         ), 
+         width = 5*ifelse(test = all(grid_pos<20),
+                          yes = 1, 
+                          no = 2
+         ),  
+         units = 'in', bg = 'white',
+         res = ifelse(test = all(grid_pos<15),
+                      yes = 150, 
+                      no = 300
+                     )
+    )
   }#if(plot_these$found)
   par(mfrow = c(grid_pos$rows,grid_pos$columns), mar = c(0,0,0.8,0), cex.main = 0.8)
   for(rw in 1:grid_pos$rows){
     for(cl in 1:grid_pos$columns){
       img.tmp <- img.crp[
-        row.breaks[rw]:row.breaks[rw+1],#TODO consider excluding tile edges (row.breaks[rw]+1):(row.breaks[rw+1]-1)
-        col.breaks[cl]:col.breaks[cl+1],#TODO consider excluding tile edges
+        min( row.breaks[rw], dim(img.crp)[1] ):
+          min( c(row.breaks[rw+1], dim(img.crp)[1]) ),#think I have? TODO consider excluding tile edges (row.breaks[rw]+1):(row.breaks[rw+1]-1)
+        min( col.breaks[cl],dim(img.crp)[2] ):
+          min( c(col.breaks[cl+1], dim(img.crp)[2]) ),#think I have? TODO consider excluding tile edges
         
       ]
       if(plot_these$found){plot(as.raster(img.tmp))}
