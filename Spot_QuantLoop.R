@@ -18,6 +18,7 @@ formals(data.frame)$stringsAsFactors <- FALSE
 #	   CHANGES: -copied from Spot_Quantifier.R
 #	            -corner double-counts cut
 #	            -1536 grid
+#	            -rigid grid option
 #
 #   REFERENCES: Kritikos, G., Banzhaf, M., Herrera-Dominguez, L. et al., (2017).
 #               A tool named Iris for versatile high-throughput phenotyping in microorganisms.
@@ -32,7 +33,8 @@ formals(data.frame)$stringsAsFactors <- FALSE
 #- Folder selector +
 #- Looping +
 #- Autocropping + 
-#- Rigidity setting
+#- Rigidity setting +
+#- Rigid crop setting ?
 #- Speed up 
 #- imager?
 
@@ -44,7 +46,7 @@ grid_pos <- list(
                   rows = 32  #8
                 )
 #Who made the plate? (Human or robot)
-is_robot <- TRUE
+is_robot <- TRUE#N.B. this predetermines several other parameters 
 # Colour channel to use
 col_chan <- 'green'#channel to use, 'red','green','blue', combinations ('redgreen') or all (RGB)
 # Palette for contour plots #can be any of hcl.pals()
@@ -55,13 +57,13 @@ plot_these <- list(grid = T,
                    contour = T
                    )
 #maximum cropped proportion
-crop_max <- ifelse(is_robot, 0.070, 0.10) 
+crop_max <- ifelse(is_robot, yes = 0.070, no = 0.10) 
 #minimum cropped proportion
-crop_min <- ifelse(is_robot, 0.045, 0.00) 
+crop_min <- ifelse(is_robot, yes = 0.045, no = 0.00) 
 #Starting grid edge as a proportion of image height or width
-edge_prop <- ifelse(is_robot, 0.065, 0.09)
+edge_prop <- ifelse(is_robot, yes = 0.065, no = 0.09)
 #maximum radio of grid spacing to default, e.g. 0.5 -> rectangles can be max 50% bigger or smaller
-spc_lim <- ifelse(is_robot, 0.00, 0.3)#0 = no grid search
+spc_lim <- ifelse(is_robot, yes = 0.00, no = 0.3)#0 = no grid search
 # Image levels
 im_levels <- 256L #Resolution is probably higher, higher values could solve thresholding problems
 
