@@ -8,7 +8,8 @@ plot_these <- list(grid = TRUE, #Fitted grid
                    contour = TRUE #Contour plot
                    )
  ```
-
+## Update 2021.07.13
+The user-selected parameter ```is_robot``` now allows the user to specify that the plate was spotted in an automatic grid, which should not vary in spacing. If set to ```TRUE```, this makes the search for the plate's edge less flexible, and draws an evenly-spaced rigid grid across that plate area (by setting ```spc_lim``` to ```0```) regardless of actual colony positions. This setting is still under development at present, other values for user-selected parameters may be recommended or bypassed completely in the near future after further testing.
 ## Example output:
 ![Fitted grid](https://github.com/Foztarz/Spot_Quantifier/blob/master/ExampleOutput/CB-Killing_01h_11-07-20.JPG-Grid.jpeg)
 ![Colonies found](https://github.com/Foztarz/Spot_Quantifier/blob/master/ExampleOutput/CB-Killing_01h_11-07-20.JPG-OtsuFound.jpeg)
