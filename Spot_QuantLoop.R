@@ -1,4 +1,4 @@
-rm(list = ls())
+# rm(list = ls()) #FOR A 'CLEAN' RUN, RESTART Rstudio: rm(list = ls()) is unfashionable
 graphics.off()
 #R versions <4.0.0 convert strings to factors, specify default behaviour
 formals(data.frame)$stringsAsFactors <- FALSE
@@ -34,6 +34,9 @@ formals(data.frame)$stringsAsFactors <- FALSE
 #- Looping +
 #- Autocropping + 
 #- Rigidity setting +
+#- Adjust crop  +
+#- Fix rigid grid SE +
+#- NON-OTSU THRESHOLDING FOR ROBOT
 #- Rigid crop setting ?
 #- Speed up 
 #- imager?
@@ -57,11 +60,11 @@ plot_these <- list(grid = T,
                    contour = T
                    )
 #maximum cropped proportion
-crop_max <- ifelse(is_robot, yes = 0.070, no = 0.10) 
+crop_max <- ifelse(is_robot, yes = 0.093, no = 0.10) 
 #minimum cropped proportion
-crop_min <- ifelse(is_robot, yes = 0.045, no = 0.00) 
+crop_min <- ifelse(is_robot, yes = 0.07, no = 0.00) 
 #Starting grid edge as a proportion of image height or width
-edge_prop <- ifelse(is_robot, yes = 0.065, no = 0.09)
+edge_prop <- ifelse(is_robot, yes = 0.08, no = 0.09)
 #maximum radio of grid spacing to default, e.g. 0.5 -> rectangles can be max 50% bigger or smaller
 spc_lim <- ifelse(is_robot, yes = 0.00, no = 0.3)#0 = no grid search
 # Image levels
@@ -216,11 +219,11 @@ for(ii in imgs){
   ots <- otsu(img.crp, levels = im_levels)
   # Basic row grid
   row_max <- diff(grid_edges$h)#outer edge
-  row_step <- round(row_max/grid_pos$rows)#size of equidistant steps
+  row_step <- row_max/grid_pos$rows#size of equidistant steps
   basic_row <- round((1:(grid_pos$rows-1)) * row_step)
   # Basic column grid
   col_max <- diff(grid_edges$v)#outer edge
-  col_step <- round(col_max/grid_pos$columns)#size of equidistant steps
+  col_step <- col_max/grid_pos$columns#size of equidistant steps
   basic_col <- round((1:(grid_pos$columns-1)) * col_step )
   
   # Threshold image
@@ -245,9 +248,15 @@ for(ii in imgs){
   row_bright <- sapply(row_starts, function(x){sum(i_rows[x+basic_row])})#check the number of colony pixels for each position
   col_bright <- sapply(col_starts, function(x){sum(i_cols[x+basic_col])})#check the number of colony pixels for each position
   # Position the equidistant grid at the midpoint of the best options
+  if(!is_robot)
+  {
   row_equi <- round(median(row_starts[row_bright %in% min(row_bright,na.rm=T)]))+basic_row
   col_equi <- round(median(col_starts[col_bright %in% min(col_bright,na.rm=T)]))+basic_col
-  
+  }else
+  {
+  row_equi <- basic_row
+  col_equi <- basic_col
+  }
   if(spc_lim)
   {
   #Set up a function to optimise grid positioning
